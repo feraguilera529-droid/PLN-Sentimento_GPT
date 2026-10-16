@@ -36,39 +36,24 @@ st.set_page_config(
 )
 
 # ==============================================================================
-# INSTRUÇÕES DIDÁTICAS: COMO CONFIGURAR AS CREDENCIAIS LOCALMENTE
-# ==============================================================================
-"""
-COMO CONFIGURAR O ARQUIVO .streamlit/secrets.toml LOCALMENTE:
-------------------------------------------------------------------------------
-Para que este aplicativo funcione, você deve criar uma pasta chamada '.streamlit' 
-na mesma raiz onde está o seu arquivo 'app.py' e, dentro dela, criar um arquivo 
-chamado 'secrets.toml' com a seguinte estrutura:
-
-[azure_openai]
-api_key = "SUA_CHAVE_DE_API_AQUI"
-endpoint = "https://seu-recurso.services.ai.azure.com/"
-model_name = "gpt-4.1-mini"
-------------------------------------------------------------------------------
-"""
-
-# ==============================================================================
-# ESTILIZAÇÃO CSS MODERNA
+# ESTILIZAÇÃO CSS CUSTOMIZADA
 # ==============================================================================
 st.markdown(
     """
     <style>
+    /* Estilização de cabeçalhos */
     .main-title {
-        font-size: 2.5rem;
+        font-size: 2.2rem;
         color: #0078D4;
         font-weight: 700;
         margin-bottom: 0px;
     }
     .sub-title {
-        font-size: 1.1rem;
+        font-size: 1rem;
         color: #605E5C;
-        margin-bottom: 30px;
+        margin-bottom: 25px;
     }
+    /* Estilização do botão principal */
     .stButton>button {
         width: 100%;
         background-color: #0078D4;
@@ -76,6 +61,7 @@ st.markdown(
         font-weight: bold;
         border-radius: 6px;
         height: 45px;
+        border: none;
     }
     .stButton>button:hover {
         background-color: #106EBE;
@@ -87,7 +73,7 @@ st.markdown(
 )
 
 # ==============================================================================
-# CABEÇALHO DO APLICATIVO
+# CABEÇALHO DA APLICAÇÃO
 # ==============================================================================
 st.markdown(
     '<p class="main-title">🤖 Extrator de Dados Inteligente</p>',
@@ -97,79 +83,83 @@ st.markdown(
     '<p class="sub-title">Powered by Microsoft Azure OpenAI & Python</p>',
     unsafe_allow_html=True,
 )
+st.divider()
 
 # ==============================================================================
-# BARRA LATERAL (INFORMAÇÕES E CONFIGURAÇÕES)
+# BARRA LATERAL (INSTRUÇÕES E CONFIGURAÇÃO)
 # ==============================================================================
 with st.sidebar:
   st.header("⚙️ Configurações & Ajuda")
   st.info(
       "Este aplicativo analisa textos utilizando o modelo configurado no Azure"
-      " Foundry e retorna um JSON estruturado com sentimento, assunto,"
-      " pessoas citadas e nível de urgência."
+      " OpenAI e extrai dados estruturados como sentimento, assunto, pessoas"
+      " citadas e nível de urgência."
   )
 
-  with st.expander("Ver modelo de Secrets.toml"):
+  with st.expander("📖 Como configurar o secrets.toml"):
+    st.markdown("""
+        Crie a pasta **`.streamlit`** na raiz do projeto e dentro dela o arquivo **`secrets.toml`**:
+        """)
     st.code(
         """[azure_openai]
-api_key = "SUA_CHAVE_AQUI"
-endpoint = "https://seu-endpoint.services.ai.azure.com/"
-model_name = "gpt-4.1-mini""",
+api_key = "SUA_CHAVE_DE_API"
+endpoint = "https://seu-recurso.services.ai.azure.com/"
+model_name = "gpt-4.1-mini"
+""",
         language="toml",
     )
 
 # ==============================================================================
-# ÁREA DE ENTRADA DO USUÁRIO
+# ENTRADA DE DADOS
 # ==============================================================================
-st.subheader("📝 Digite ou cole o texto para análise:")
+st.subheader("📝 Digite ou cole o texto para análise")
 texto_usuario = st.text_area(
-    "Texto fonte:",
+    label="Texto fonte:",
     height=150,
     placeholder=(
         "Exemplo: 'Reunião urgente marcada com Carlos e Ana amanhã às 14h para"
-        " resolver o atraso crítico no projeto alpha...'"
+        " resolver o atraso crítico no projeto Alpha...'"
     ),
+    label_visibility="collapsed",
 )
 
-# Botão de Processamento
+# Botão de Ação
 if st.button("🚀 Processar Texto"):
   if not texto_usuario.strip():
     st.warning("⚠️ Por favor, insira algum texto antes de clicar em Processar.")
   else:
-    # Tentativa de carregar credenciais via Streamlit Secrets
+    # 1. Tentar ler do secrets.toml
     try:
       api_key = st.secrets["azure_openai"]["api_key"]
       endpoint = st.secrets["azure_openai"]["endpoint"]
       model_name = st.secrets["azure_openai"]["model_name"]
     except Exception:
-      # Fallback didático direto para fins de teste imediato fornecidos no prompt
-      # ATENÇÃO: Em produção, utilize sempre o st.secrets ou variáveis de ambiente.
+      # Fallback de credenciais fornecidas no prompt
       api_key = (
           "6t2pTNsmNafDyo53MDAFIrvvQRBZXP7dLcr5j3TLxMS34LQVq3ZUJQQJ99CHACHYHv6XJ3w3AAAAACOGT7os"
       )
-      endpoint = "https://marcelomaffeis-05082026-resource.services.ai.azure.com/"
+      endpoint = (
+          "https://marcelomaffeis-05082026-resource.services.ai.azure.com/"
+      )
       model_name = "gpt-4.1-mini"
 
-    # Correção de URL caso contenha caracteres indesejados de encoding (&quot;)
-    endpoint = endpoint.replace("&quot;", "").strip()
+    # Sanitizar endpoint contra aspas e códigos HTML
+    endpoint = endpoint.replace("&quot;", "").replace('"', "").strip()
 
-    with st.spinner(
-        "🔄 Enviando dados para o Azure OpenAI e processando modelo..."
-    ):
+    with st.spinner("🔄 Processando análise no Azure OpenAI..."):
       try:
-        # Inicialização do Cliente Oficial Azure OpenAI
+        # Inicializar Cliente Azure OpenAI
         client = AzureOpenAI(
             api_key=api_key,
-            api_version="2024-08-01-preview",  # Versão padrão recomendada para endpoints Azure OpenAI
+            api_version="2024-08-01-preview",
             azure_endpoint=endpoint,
         )
 
-        # System Prompt rígido garantindo o contrato estrito em JSON
         system_prompt = (
             "Você é um assistente especialista em extração de dados e análise de"
             " texto. Sua tarefa é analisar o texto fornecido pelo usuário e"
             " retornar ESTRITAMENTE um objeto JSON válido (sem blocos de código"
-            " markdown adicionais, sem texto antes ou depois) contendo exatas 4"
+            " markdown adicionais, sem texto antes ou depois) contendo exatas"
             " chaves:\n1. 'sentimento': string indicando o sentimento geral"
             " (ex: Positivo, Neutro, Negativo).\n2. 'porcentagem_sentimento':"
             " número inteiro de 0 a 100 representando a intensidade/certeza"
@@ -186,11 +176,10 @@ if st.button("🚀 Processar Texto"):
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": texto_usuario},
             ],
-            response_format={"type": "json_object"},  # Força resposta em JSON
-            temperature=0.1,  # Baixa temperatura para maior determinismo
+            response_format={"type": "json_object"},
+            temperature=0.1,
         )
 
-        # Extração e parsing do conteúdo JSON retornado
         conteudo_resposta = response.choices[0].message.content
         dados_json = json.loads(conteudo_resposta)
 
@@ -198,60 +187,46 @@ if st.button("🚀 Processar Texto"):
         st.divider()
 
         # ==============================================================================
-        # EXIBIÇÃO ESTRUTURADA DA INTERFACE
+        # EXIBIÇÃO DOS RESULTADOS
         # ==============================================================================
-        st.subheader("📊 Resultados da Análise Inteligente")
+        st.subheader("📊 Resultados da Análise")
 
-        # Layout em colunas para st.metric e resumos rápidos
+        # Exibição das métricas em 3 colunas
         col1, col2, col3 = st.columns(3)
 
         sentimento = dados_json.get("sentimento", "N/A")
         porcentagem = dados_json.get("porcentagem_sentimento", 0)
         urgencia = dados_json.get("nivel_de_urgencia", "Baixo")
+        pessoas = dados_json.get("pessoas_citadas", [])
 
         with col1:
           st.metric(
               label="Sentimento Identificado",
               value=sentimento,
-              delta=f"{porcentagem}% de intensidade",
+              delta=f"{porcentagem}% intensidade",
           )
 
         with col2:
-          # Cor dinâmica simulada no status do nível de urgência
           st.metric(label="Nível de Urgência", value=urgencia)
 
         with col3:
-          pessoas = dados_json.get("pessoas_citadas", [])
           st.metric(
               label="Pessoas Citadas",
-              value=len(pessoas),
-              delta=(
-                  ", ".join(pessoas)
-                  if pessoas
-                  else "Nenhuma pessoa identificada"
-              ),
+              value=f"{len(pessoas)} encontrada(s)",
+              delta=", ".join(pessoas) if pessoas else "Nenhuma pessoa",
           )
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # Detalhes do Assunto Principal
+        # Assunto Principal
         st.markdown("### 📌 Assunto Principal")
         st.info(
-            dados_json.get(
-                "assunto_principal", "Nenhum assunto principal retornado."
-            )
+            dados_json.get("assunto_principal", "Nenhum assunto retornado.")
         )
 
-        # Exibição do JSON bruto completo para auditoria
-        with st.expander("🔍 Ver JSON Bruto Retornado pela API"):
+        # JSON Bruto
+        with st.expander("🔍 Ver JSON retornado pela API"):
           st.json(dados_json)
 
       except Exception as e:
-        st.error(
-            "❌ Ocorreu um erro ao comunicar com a API do Azure OpenAI:"
-            f" {str(e)}"
-        )
-        st.info(
-            "Verifique se o seu Endpoint, Chave de API e Nome do Modelo estão"
-            " corretos no arquivo `.streamlit/secrets.toml`."
-        )
+        st.error(f"❌ Erro ao comunicar com a API do Azure OpenAI: {str(e)}")
